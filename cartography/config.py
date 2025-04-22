@@ -43,6 +43,8 @@ class Config:
     :param azure_client_secret: Client Secret for connecting in a Service Principal Authentication approach. Optional.
     :type aws_requested_syncs: str
     :param aws_requested_syncs: Comma-separated list of AWS resources to sync. Optional.
+    :type aws_regions: str
+    :param aws_regions: Comma-separated list of AWS regions to sync. Optional.
     :type analysis_job_directory: str
     :param analysis_job_directory: Path to a directory tree containing analysis jobs to run. Optional.
     :type oci_sync_all_profiles: bool
@@ -134,6 +136,7 @@ class Config:
         azure_client_id=None,
         azure_client_secret=None,
         aws_requested_syncs=None,
+        aws_regions=None,
         analysis_job_directory=None,
         oci_sync_all_profiles=None,
         okta_org_id=None,
@@ -194,6 +197,7 @@ class Config:
         self.aws_requested_syncs = aws_requested_syncs
         self.analysis_job_directory = analysis_job_directory
         self.oci_sync_all_profiles = oci_sync_all_profiles
+        self.aws_regions = aws_regions
         self.okta_org_id = okta_org_id
         self.okta_api_key = okta_api_key
         self.okta_saml_role_regex = okta_saml_role_regex

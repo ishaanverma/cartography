@@ -8,6 +8,7 @@ from typing import Optional
 import cartography.config
 import cartography.sync
 import cartography.util
+from cartography.intel.aws.util.common import parse_and_validate_aws_regions
 from cartography.intel.aws.util.common import parse_and_validate_aws_requested_syncs
 from cartography.intel.semgrep.dependencies import parse_and_validate_semgrep_ecosystems
 
@@ -219,6 +220,15 @@ class CLI:
                 'Comma-separated list of AWS resources to sync. Example 1: "ecr,s3,ec2:instance" for ECR, S3, and all '
                 'EC2 instance resources. See the full list available in source code at cartography.intel.aws.resources.'
                 ' If not specified, cartography by default will run all AWS sync modules available.'
+            ),
+        )
+        parser.add_argument(
+            '--aws-regions',
+            type=str,
+            default=None,
+            help=(
+                'Comma-separated list of AWS regions to sync. Example 1: "us-east-1,us-west-1".'
+                'If not specified, cartography will autodiscover regions.'
             ),
         )
         parser.add_argument(
@@ -604,6 +614,9 @@ class CLI:
         if config.aws_requested_syncs:
             # No need to store the returned value; we're using this for input validation.
             parse_and_validate_aws_requested_syncs(config.aws_requested_syncs)
+
+        if config.aws_regions:
+            parse_and_validate_aws_regions(config.aws_regions)
 
         # Azure config
         if config.azure_sp_auth and config.azure_client_secret_env_var:

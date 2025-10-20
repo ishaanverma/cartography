@@ -20,13 +20,14 @@ from typing import Set
 from typing import Type
 from typing import TypeVar
 from typing import Union
+from urllib.parse import urlencode
 
 import backoff
 import boto3
 import botocore
 import neo4j
 from botocore.exceptions import EndpointConnectionError
-from urllib.parse import urlencode
+
 from cartography.graph.job import GraphJob
 from cartography.graph.statement import get_job_shortname
 from cartography.stats import get_stats_client
@@ -501,5 +502,5 @@ def join_url(base_url: str, params: dict[str, str]) -> str:
     -> "https://sts.us-east-1.amazonaws.com/?Action=GetCallerIdentity&Version=2011-06-15"
     """
     base_url = base_url.rstrip("/")
-    params = urlencode(params)
-    return f"{base_url}/?{params}"
+    encoded_params = urlencode(params)
+    return f"{base_url}/?{encoded_params}"

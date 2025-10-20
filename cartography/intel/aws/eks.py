@@ -13,8 +13,8 @@ from cartography.graph.job import GraphJob
 from cartography.intel.kubernetes import start_k8s_ingestion_with_parameters
 from cartography.models.aws.eks.clusters import EKSClusterSchema
 from cartography.util import aws_handle_regions
-from cartography.util import timeit
 from cartography.util import join_url
+from cartography.util import timeit
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +121,7 @@ def _get_eks_bearer_token(
     params = {
         "method": "GET",
         "url": join_url(
-            client.meta.endpoint_url, # https://sts.{region}.amazonaws.com
+            client.meta.endpoint_url,  # https://sts.{region}.amazonaws.com
             {"Action": "GetCallerIdentity", "Version": "2011-06-15"},
         ),
         "body": {},

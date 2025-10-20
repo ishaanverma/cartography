@@ -10,17 +10,12 @@ from botocore.signers import RequestSigner
 
 from cartography.client.core.tx import load
 from cartography.graph.job import GraphJob
-from cartography.intel.aws.util.arns import convert_sts_arn_to_iam_arn
 from cartography.intel.kubernetes import start_k8s_ingestion_with_parameters
 from cartography.models.aws.eks.clusters import EKSClusterSchema
 from cartography.util import aws_handle_regions
 from cartography.util import timeit
 
 logger = logging.getLogger(__name__)
-
-EKS_ADMIN_VIEW_POLICY_ARN = (
-    "arn:aws:eks::aws:cluster-access-policy/AmazonEKSAdminViewPolicy"
-)
 
 
 @timeit
@@ -101,63 +96,6 @@ def transform(cluster_data: dict[str, Any]) -> list[dict[str, Any]]:
             transformed_dict["created_at"] = str(transformed_dict["createdAt"])
         transformed_list.append(transformed_dict)
     return transformed_list
-
-
-def create_eks_access_entry(
-    boto3_session: boto3.session.Session,
-    region: str,
-    cluster_name: str,
-) -> None:
-    client = boto3_session.client("eks", region_name=region)
-    sts = boto3_session.client("sts", region_name=region)
-    assumed_role_arn = sts.get_caller_identity()["Arn"]
-
-    access_entries = []
-    paginator = client.get_paginator("list_access_entries")
-    for page in paginator.paginate(clusterName=cluster_name):
-        access_entries.extend(page["accessEntries"])
-
-    principal_arn = convert_sts_arn_to_iam_arn(assumed_role_arn)
-
-    if not any(access_entry == principal_arn for access_entry in access_entries):
-        logger.info(
-            "Creating access entry for cluster '%s' with principal '%s'",
-            cluster_name,
-            principal_arn,
-        )
-        client.create_access_entry(
-            clusterName=cluster_name,
-            principalArn=principal_arn,
-            type="STANDARD",
-        )
-
-    # access entry exists, now check if it has the correct access policy attached
-    access_policies = []
-    paginator = client.get_paginator("list_associated_access_policies")
-    for page in paginator.paginate(
-        clusterName=cluster_name,
-        principalArn=principal_arn,
-    ):
-        access_policies.extend(page["associatedAccessPolicies"])
-
-    if not any(
-        access_policy["policyArn"] == EKS_ADMIN_VIEW_POLICY_ARN
-        and access_policy["accessScope"].get("type") == "cluster"
-        for access_policy in access_policies
-    ):
-        logger.info(
-            "Associating access policy for cluster '%s' with principal '%s'",
-            cluster_name,
-            principal_arn,
-        )
-        client.associate_access_policy(
-            clusterName=cluster_name,
-            principalArn=principal_arn,
-            policyArn=EKS_ADMIN_VIEW_POLICY_ARN,
-            accessScope={
-                "type": "cluster",
-            },
-        )
 
 
 def _get_eks_bearer_token(
@@ -265,29 +203,7 @@ def sync(
 
         if common_job_parameters.get("aws_eks_sync_cluster_resources"):
             # load EKS resources using kubernetes intel module
-            # 1. create access entry for role if not present
-            # 2. use access entry to authenticate to EKS cluster
-            # 3. sync EKS resources using kubernetes intel module
-
             for cluster_name, cluster_info in cluster_data.items():
-                try:
-                    logger.info(
-                        "Creating EKS access entry for cluster '%s' in region '%s' in account '%s'.",
-                        cluster_name,
-                        region,
-                        current_aws_account_id,
-                    )
-                    create_eks_access_entry(boto3_session, region, cluster_name)
-                except Exception:
-                    logger.warning(
-                        "Failed to create EKS access entry for cluster '%s' in region '%s' in account '%s'. Skipping...",
-                        cluster_name,
-                        region,
-                        current_aws_account_id,
-                        exc_info=True,
-                    )
-                    continue
-
                 endpoint = cluster_info["endpoint"]
                 cert_data = cluster_info["certificateAuthority"]["data"]
                 kubeconfig = create_kubeconfig(

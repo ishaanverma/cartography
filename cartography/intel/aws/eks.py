@@ -31,6 +31,7 @@ def get_eks_clusters(boto3_session: boto3.session.Session, region: str) -> list[
 
 
 @timeit
+@aws_handle_regions
 def get_eks_describe_cluster(
     boto3_session: boto3.session.Session,
     region: str,
@@ -99,6 +100,7 @@ def transform(cluster_data: dict[str, Any]) -> list[dict[str, Any]]:
     return transformed_list
 
 
+@aws_handle_regions
 def _get_eks_bearer_token(
     boto3_session: boto3.session.Session, cluster_id: str, region: str
 ) -> str:
@@ -119,7 +121,7 @@ def _get_eks_bearer_token(
     params = {
         "method": "GET",
         "url": join_url(
-            client.meta.endpoint_url,
+            client.meta.endpoint_url, # https://sts.{region}.amazonaws.com
             {"Action": "GetCallerIdentity", "Version": "2011-06-15"},
         ),
         "body": {},
@@ -227,6 +229,7 @@ def sync(
                     mode="w", suffix=".yaml"
                 ) as tmp_kubeconfig_file:
                     yaml.dump(kubeconfig, tmp_kubeconfig_file, default_flow_style=False)
+                    tmp_kubeconfig_file.flush()
 
                     job_parameters = {
                         "UPDATE_TAG": common_job_parameters["UPDATE_TAG"],

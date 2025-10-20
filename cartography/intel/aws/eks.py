@@ -209,9 +209,6 @@ def sync(
         if common_job_parameters.get("aws_eks_sync_cluster_resources"):
             # load EKS resources using kubernetes intel module
             for cluster_name, cluster_info in cluster_data.items():
-                if cluster_name != "infra-testing-us":
-                    continue
-
                 endpoint = cluster_info["endpoint"]
                 cert_data = cluster_info["certificateAuthority"]["data"]
                 kubeconfig = create_kubeconfig(

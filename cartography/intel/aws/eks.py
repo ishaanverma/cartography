@@ -14,6 +14,7 @@ from cartography.intel.kubernetes import start_k8s_ingestion_with_parameters
 from cartography.models.aws.eks.clusters import EKSClusterSchema
 from cartography.util import aws_handle_regions
 from cartography.util import timeit
+from cartography.util import join_url
 
 logger = logging.getLogger(__name__)
 
@@ -117,7 +118,10 @@ def _get_eks_bearer_token(
 
     params = {
         "method": "GET",
-        "url": f"https://sts.{region}.amazonaws.com/?Action=GetCallerIdentity&Version=2011-06-15",
+        "url": join_url(
+            client.meta.endpoint_url,
+            {"Action": "GetCallerIdentity", "Version": "2011-06-15"},
+        ),
         "body": {},
         "headers": {"x-k8s-aws-id": cluster_id},
         "context": {},
@@ -204,6 +208,9 @@ def sync(
         if common_job_parameters.get("aws_eks_sync_cluster_resources"):
             # load EKS resources using kubernetes intel module
             for cluster_name, cluster_info in cluster_data.items():
+                if cluster_name != "infra-testing-us":
+                    continue
+
                 endpoint = cluster_info["endpoint"]
                 cert_data = cluster_info["certificateAuthority"]["data"]
                 kubeconfig = create_kubeconfig(

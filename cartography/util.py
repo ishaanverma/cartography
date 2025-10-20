@@ -26,7 +26,7 @@ import boto3
 import botocore
 import neo4j
 from botocore.exceptions import EndpointConnectionError
-
+from urllib.parse import urlencode
 from cartography.graph.job import GraphJob
 from cartography.graph.statement import get_job_shortname
 from cartography.stats import get_stats_client
@@ -487,3 +487,19 @@ def to_synchronous(*awaitables: Awaitable[Any]) -> List[Any]:
     results = to_synchronous(future_1, future_2)
     """
     return asyncio.get_event_loop().run_until_complete(asyncio.gather(*awaitables))
+
+
+def join_url(base_url: str, params: dict[str, str]) -> str:
+    """
+    Join a base URL with a dictionary of path parameters.
+    :param base_url: The base URL
+    :param params: A dictionary of path parameters
+    :return: A joined URL
+
+    Example:
+    join_url("https://sts.us-east-1.amazonaws.com", {"Action": "GetCallerIdentity", "Version": "2011-06-15"})
+    -> "https://sts.us-east-1.amazonaws.com/?Action=GetCallerIdentity&Version=2011-06-15"
+    """
+    base_url = base_url.rstrip("/")
+    params = urlencode(params)
+    return f"{base_url}/?{params}"

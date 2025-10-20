@@ -10,6 +10,7 @@ from cartography import util
 from cartography.util import aws_handle_regions
 from cartography.util import batch
 from cartography.util import run_analysis_and_ensure_deps
+from cartography.util import join_url
 
 
 def test_run_analysis_job_default_package(mocker):
@@ -224,4 +225,21 @@ def test_run_analysis_and_ensure_deps_no_requirements(
         "aws_foreign_accounts.json",
         neo4j_session,
         common_job_parameters,
+    )
+
+def test_join_url():
+    assert (
+        join_url(
+            "https://sts.us-east-1.amazonaws.com",
+            {"Action": "GetCallerIdentity", "Version": "2011-06-15"},
+        )
+        == "https://sts.us-east-1.amazonaws.com/?Action=GetCallerIdentity&Version=2011-06-15"
+    )
+
+    assert (
+        join_url(
+            "https://sts.us-east-1.amazonaws.com/",
+            {"Action": "GetCallerIdentity", "Version": "2011-06-15"},
+        )
+        == "https://sts.us-east-1.amazonaws.com/?Action=GetCallerIdentity&Version=2011-06-15"
     )

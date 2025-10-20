@@ -200,11 +200,8 @@ class Config:
         aws_regions=None,
         aws_best_effort_mode=False,
         aws_cloudtrail_management_events_lookback_hours=None,
-<<<<<<< HEAD
         aws_eks_sync_cluster_resources=False,
-=======
         experimental_aws_inspector_batch=1000,
->>>>>>> upstream/master
         azure_sync_all_subscriptions=False,
         azure_sp_auth=None,
         azure_tenant_id=None,
@@ -297,11 +294,8 @@ class Config:
         self.aws_cloudtrail_management_events_lookback_hours = (
             aws_cloudtrail_management_events_lookback_hours
         )
-<<<<<<< HEAD
         self.aws_eks_sync_cluster_resources = aws_eks_sync_cluster_resources
-=======
         self.experimental_aws_inspector_batch = experimental_aws_inspector_batch
->>>>>>> upstream/master
         self.azure_sync_all_subscriptions = azure_sync_all_subscriptions
         self.azure_sp_auth = azure_sp_auth
         self.azure_tenant_id = azure_tenant_id

@@ -31,7 +31,6 @@ def get_eks_clusters(boto3_session: boto3.session.Session, region: str) -> list[
 
 
 @timeit
-@aws_handle_regions
 def get_eks_describe_cluster(
     boto3_session: boto3.session.Session,
     region: str,

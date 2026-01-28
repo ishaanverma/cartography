@@ -24,6 +24,12 @@ class KubernetesIngressNodeProperties(CartographyNodeProperties):
     default_backend: PropertyRef = PropertyRef("default_backend")
     cluster_name: PropertyRef = PropertyRef("CLUSTER_NAME", set_in_kwargs=True)
     lastupdated: PropertyRef = PropertyRef("lastupdated", set_in_kwargs=True)
+    load_balancer_dns_names: PropertyRef = PropertyRef("load_balancer_dns_names")
+    # AWS Load Balancer Controller group name
+    ingress_group_name: PropertyRef = PropertyRef(
+        "ingress_group_name", extra_index=True
+    )
+    
 
 
 @dataclass(frozen=True)

@@ -375,7 +375,10 @@ def test_clusterip_service_does_not_create_loadbalancer_relationship(
 
     # Assert: Service was loaded
     assert check_nodes(neo4j_session, "KubernetesService", ["name"]) == {
-        ("my-service",)
+        ("my-service",),
+        ("api-service",),
+        ("app-service",),
+        ("simple-service",),
     }
 
     # Assert: No USES_LOAD_BALANCER relationship (ClusterIP services don't have load_balancer_dns_names)

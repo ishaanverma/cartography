@@ -8,7 +8,9 @@ from cartography.intel.kubernetes.services import load_services
 from tests.data.kubernetes.clusters import KUBERNETES_CLUSTER_DATA
 from tests.data.kubernetes.clusters import KUBERNETES_CLUSTER_IDS
 from tests.data.kubernetes.clusters import KUBERNETES_CLUSTER_NAMES
+from tests.data.kubernetes.ingress import KUBERNETES_ALB_INGRESS_DATA
 from tests.data.kubernetes.ingress import KUBERNETES_INGRESS_DATA
+from tests.data.kubernetes.ingress import SHARED_ALB_DNS_NAME
 from tests.data.kubernetes.namespaces import KUBERNETES_CLUSTER_1_NAMESPACES_DATA
 from tests.data.kubernetes.namespaces import KUBERNETES_CLUSTER_2_NAMESPACES_DATA
 from tests.data.kubernetes.services import KUBERNETES_SERVICES_DATA
@@ -171,3 +173,80 @@ def test_ingress_cleanup(neo4j_session, _create_test_cluster):
 
     # Assert: Expect that the ingresses were deleted
     assert check_nodes(neo4j_session, "KubernetesIngress", ["name"]) == set()
+
+
+def test_load_alb_ingresses_with_ingress_group(neo4j_session, _create_test_cluster):
+    """Test that AWS ALB ingresses with ingress group annotations are loaded correctly."""
+    # Act
+    load_ingresses(
+        neo4j_session,
+        KUBERNETES_ALB_INGRESS_DATA,
+        update_tag=TEST_UPDATE_TAG,
+        cluster_id=KUBERNETES_CLUSTER_IDS[0],
+        cluster_name=KUBERNETES_CLUSTER_NAMES[0],
+    )
+
+    # Assert: Expect that the ALB ingresses were loaded with correct properties
+    expected_nodes = {
+        ("alb-ingress-api", "shared-alb"),
+        ("alb-ingress-web", "shared-alb"),
+    }
+    assert (
+        check_nodes(neo4j_session, "KubernetesIngress", ["name", "ingress_group_name"])
+        == expected_nodes
+    )
+
+
+def test_load_alb_ingresses_load_balancer_dns_names(neo4j_session, _create_test_cluster):
+    """Test that load balancer DNS names are stored correctly on ingresses."""
+    # Act
+    load_ingresses(
+        neo4j_session,
+        KUBERNETES_ALB_INGRESS_DATA,
+        update_tag=TEST_UPDATE_TAG,
+        cluster_id=KUBERNETES_CLUSTER_IDS[0],
+        cluster_name=KUBERNETES_CLUSTER_NAMES[0],
+    )
+
+    # Assert: Check that load_balancer_dns_names is set correctly
+    result = neo4j_session.run(
+        """
+        MATCH (i:KubernetesIngress)
+        WHERE i.ingress_group_name = 'shared-alb'
+        RETURN i.name as name, i.load_balancer_dns_names as dns_names
+        ORDER BY i.name
+        """
+    )
+    records = list(result)
+
+    assert len(records) == 2
+    # Both ingresses in the same group should have the same ALB DNS name
+    for record in records:
+        assert SHARED_ALB_DNS_NAME in record["dns_names"]
+
+
+def test_load_ingresses_without_ingress_group(neo4j_session, _create_test_cluster):
+    """Test that ingresses without ingress group have null ingress_group_name."""
+    # Act
+    load_ingresses(
+        neo4j_session,
+        KUBERNETES_INGRESS_DATA,
+        update_tag=TEST_UPDATE_TAG,
+        cluster_id=KUBERNETES_CLUSTER_IDS[0],
+        cluster_name=KUBERNETES_CLUSTER_NAMES[0],
+    )
+
+    # Assert: Expect ingresses without ALB annotation to have null ingress_group_name
+    result = neo4j_session.run(
+        """
+        MATCH (i:KubernetesIngress)
+        WHERE i.name IN ['my-ingress', 'simple-ingress']
+        RETURN i.name as name, i.ingress_group_name as group_name
+        ORDER BY i.name
+        """
+    )
+    records = list(result)
+
+    assert len(records) == 2
+    for record in records:
+        assert record["group_name"] is None

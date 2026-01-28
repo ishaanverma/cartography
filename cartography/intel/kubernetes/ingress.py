@@ -6,6 +6,7 @@ import neo4j
 from kubernetes.client.models import V1HTTPIngressRuleValue
 from kubernetes.client.models import V1Ingress
 from kubernetes.client.models import V1IngressBackend
+from kubernetes.client.models import V1IngressLoadBalancerIngress
 from kubernetes.client.models import V1IngressRule
 
 from cartography.client.core.tx import load
@@ -82,6 +83,23 @@ def _format_ingress_rules(rules: list[V1IngressRule] | None) -> list[dict[str, A
     return transformed_rules
 
 
+def _extract_load_balancer_dns_names(
+    ingress_status: list[V1IngressLoadBalancerIngress] | None,
+) -> list[str]:
+    """
+    Extract DNS hostnames from ingress load balancer status.
+    Used to match KubernetesIngress to cloud load balancer nodes.
+    """
+    if ingress_status is None:
+        return []
+
+    dns_names = []
+    for item in ingress_status:
+        if item.hostname:
+            dns_names.append(item.hostname)
+    return dns_names
+
+
 def transform_ingresses(ingress: list[V1Ingress]) -> list[dict[str, Any]]:
     transformed_ingresses: list[dict[str, Any]] = []
 
@@ -93,6 +111,17 @@ def transform_ingresses(ingress: list[V1Ingress]) -> list[dict[str, Any]]:
             for path in rule.get("paths", []):
                 if path.get("backend_service_name"):
                     backend_services.add(path["backend_service_name"])
+
+        # Extract load balancer DNS names from status for cloud LB matching
+        load_balancer_dns_names: list[str] = []
+        if item.status and item.status.load_balancer:
+            load_balancer_dns_names = _extract_load_balancer_dns_names(
+                item.status.load_balancer.ingress
+            )
+
+        # Extract ingress group name from annotations (used in AWS Load Balancer Controller)
+        annotations = item.metadata.annotations or {}
+        ingress_group_name = annotations.get("alb.ingress.kubernetes.io/group.name")
 
         transformed_ingresses.append(
             {
@@ -108,6 +137,8 @@ def transform_ingresses(ingress: list[V1Ingress]) -> list[dict[str, Any]]:
                     _format_ingress_backend(item.spec.default_backend)
                 ),
                 "target_services": list[str](backend_services),
+                "ingress_group_name": ingress_group_name,
+                "load_balancer_dns_names": load_balancer_dns_names,
             }
         )
     return transformed_ingresses

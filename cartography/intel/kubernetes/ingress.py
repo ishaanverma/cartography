@@ -75,7 +75,7 @@ def _format_ingress_rules(rules: list[V1IngressRule] | None) -> list[dict[str, A
     for rule in rules:
         transformed_rules.append(
             {
-                "host": rule.host, # will be None when host is not specified
+                "host": rule.host,  # will be None when host is not specified
                 "paths": _format_ingress_rule_paths(rule.http),
             }
         )

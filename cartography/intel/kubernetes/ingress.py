@@ -71,15 +71,14 @@ def _format_ingress_rules(rules: list[V1IngressRule] | None) -> list[dict[str, A
         return transformed_rules
 
     # an ingress rule maps the paths under a specified
-    # host to a backend service
+    # host to a backend service. host names are optional.
     for rule in rules:
-        if rule.host:
-            transformed_rules.append(
-                {
-                    "host": rule.host,
-                    "paths": _format_ingress_rule_paths(rule.http),
-                }
-            )
+        transformed_rules.append(
+            {
+                "host": rule.host, # will be None when host is not specified
+                "paths": _format_ingress_rule_paths(rule.http),
+            }
+        )
     return transformed_rules
 
 
@@ -107,19 +106,26 @@ def transform_ingresses(ingress: list[V1Ingress]) -> list[dict[str, Any]]:
         transformed_rules = _format_ingress_rules(item.spec.rules)
 
         backend_services = set[str]()
+        # extract backend services from ingress rules
         for rule in transformed_rules:
             for path in rule.get("paths", []):
                 if path.get("backend_service_name"):
                     backend_services.add(path["backend_service_name"])
 
-        # Extract load balancer DNS names from status for cloud LB matching
+        # include default backend service if specified
+        if item.spec.default_backend:
+            default_backend_service = _format_ingress_backend(item.spec.default_backend)
+            if default_backend_service.get("backend_service_name"):
+                backend_services.add(default_backend_service["backend_service_name"])
+
+        # extract load balancer DNS names from status for cloud LB matching
         load_balancer_dns_names: list[str] = []
         if item.status and item.status.load_balancer:
             load_balancer_dns_names = _extract_load_balancer_dns_names(
                 item.status.load_balancer.ingress
             )
 
-        # Extract ingress group name from annotations (used in AWS Load Balancer Controller)
+        # extract ingress group name from annotations (used in AWS Load Balancer Controller)
         annotations = item.metadata.annotations or {}
         ingress_group_name = annotations.get("alb.ingress.kubernetes.io/group.name")
 

@@ -29,7 +29,6 @@ class KubernetesIngressNodeProperties(CartographyNodeProperties):
     ingress_group_name: PropertyRef = PropertyRef(
         "ingress_group_name", extra_index=True
     )
-    
 
 
 @dataclass(frozen=True)

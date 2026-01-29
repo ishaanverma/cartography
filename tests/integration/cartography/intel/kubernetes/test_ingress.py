@@ -197,7 +197,9 @@ def test_load_alb_ingresses_with_ingress_group(neo4j_session, _create_test_clust
     )
 
 
-def test_load_alb_ingresses_load_balancer_dns_names(neo4j_session, _create_test_cluster):
+def test_load_alb_ingresses_load_balancer_dns_names(
+    neo4j_session, _create_test_cluster
+):
     """Test that load balancer DNS names are stored correctly on ingresses."""
     # Act
     load_ingresses(

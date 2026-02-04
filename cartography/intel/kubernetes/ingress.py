@@ -108,7 +108,7 @@ def transform_ingresses(ingress: list[V1Ingress]) -> list[dict[str, Any]]:
         backend_services = set[str]()
         # extract backend services from ingress rules
         for rule in transformed_rules:
-            for path in rule.get("paths", []):
+            for path in rule.get("paths") or []:
                 if path.get("backend_service_name"):
                     backend_services.add(path["backend_service_name"])
 

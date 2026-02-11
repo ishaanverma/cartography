@@ -1,15 +1,22 @@
+from unittest.mock import MagicMock
+from unittest.mock import patch
+
 import pytest
 
+import cartography.intel.kubernetes.ingress
 from cartography.intel.kubernetes.clusters import load_kubernetes_cluster
 from cartography.intel.kubernetes.ingress import cleanup
 from cartography.intel.kubernetes.ingress import load_ingresses
+from cartography.intel.kubernetes.ingress import sync_ingress
 from cartography.intel.kubernetes.namespaces import load_namespaces
 from cartography.intel.kubernetes.services import load_services
 from tests.data.kubernetes.clusters import KUBERNETES_CLUSTER_DATA
 from tests.data.kubernetes.clusters import KUBERNETES_CLUSTER_IDS
 from tests.data.kubernetes.clusters import KUBERNETES_CLUSTER_NAMES
 from tests.data.kubernetes.ingress import KUBERNETES_ALB_INGRESS_DATA
+from tests.data.kubernetes.ingress import KUBERNETES_ALB_INGRESS_RAW
 from tests.data.kubernetes.ingress import KUBERNETES_INGRESS_DATA
+from tests.data.kubernetes.ingress import KUBERNETES_INGRESS_RAW
 from tests.data.kubernetes.ingress import SHARED_ALB_DNS_NAME
 from tests.data.kubernetes.namespaces import KUBERNETES_CLUSTER_1_NAMESPACES_DATA
 from tests.data.kubernetes.namespaces import KUBERNETES_CLUSTER_2_NAMESPACES_DATA
@@ -41,8 +48,40 @@ def _create_test_cluster(neo4j_session):
         cluster_id=KUBERNETES_CLUSTER_IDS[1],
         cluster_name=KUBERNETES_CLUSTER_NAMES[1],
     )
+    load_services(
+        neo4j_session,
+        KUBERNETES_SERVICES_DATA,
+        update_tag=TEST_UPDATE_TAG,
+        cluster_id=KUBERNETES_CLUSTER_IDS[0],
+        cluster_name=KUBERNETES_CLUSTER_NAMES[0],
+    )
 
     yield
+
+    neo4j_session.run(
+        """
+        MATCH (n: KubernetesIngress)
+        DETACH DELETE n
+        """,
+    )
+    neo4j_session.run(
+        """
+        MATCH (n: KubernetesService)
+        DETACH DELETE n
+        """,
+    )
+    neo4j_session.run(
+        """
+        MATCH (n: KubernetesNamespace)
+        DETACH DELETE n
+        """,
+    )
+    neo4j_session.run(
+        """
+        MATCH (n: KubernetesCluster)
+        DETACH DELETE n
+        """,
+    )
 
 
 def test_load_ingresses(neo4j_session, _create_test_cluster):
@@ -117,15 +156,6 @@ def test_load_ingress_to_cluster_relationship(neo4j_session, _create_test_cluste
 
 
 def test_load_ingress_to_service_relationship(neo4j_session, _create_test_cluster):
-    # Arrange: Load services first
-    load_services(
-        neo4j_session,
-        KUBERNETES_SERVICES_DATA,
-        update_tag=TEST_UPDATE_TAG,
-        cluster_id=KUBERNETES_CLUSTER_IDS[0],
-        cluster_name=KUBERNETES_CLUSTER_NAMES[0],
-    )
-
     # Act: Load ingresses
     load_ingresses(
         neo4j_session,
@@ -252,3 +282,131 @@ def test_load_ingresses_without_ingress_group(neo4j_session, _create_test_cluste
     assert len(records) == 2
     for record in records:
         assert record["group_name"] is None
+
+
+@patch.object(cartography.intel.kubernetes.ingress, "get_ingress")
+def test_sync_ingress_end_to_end(mock_get_ingress, neo4j_session, _create_test_cluster):
+    """
+    Test the complete end-to-end ingress sync flow.
+    """
+    # Arrange: Mock get_ingress with raw Kubernetes API objects
+    mock_get_ingress.return_value = KUBERNETES_INGRESS_RAW
+
+    # Create a mock K8s client
+    k8s_client = MagicMock()
+    k8s_client.name = KUBERNETES_CLUSTER_NAMES[0]
+
+    # Define common job parameters
+    common_job_parameters = {
+        "UPDATE_TAG": TEST_UPDATE_TAG,
+        "CLUSTER_ID": KUBERNETES_CLUSTER_IDS[0],
+    }
+
+    # Act: Run the complete sync
+    sync_ingress(
+        neo4j_session=neo4j_session,
+        client=k8s_client,
+        update_tag=TEST_UPDATE_TAG,
+        common_job_parameters=common_job_parameters,
+    )
+
+    # Assert: Verify get_ingress was called with the client
+    mock_get_ingress.assert_called_once_with(k8s_client)
+
+    # Assert: Verify Ingress nodes were created
+    expected_ingress_nodes = {
+        ("my-ingress", "nginx"),
+        ("simple-ingress", "nginx"),
+    }
+    actual_ingress_nodes = check_nodes(
+        neo4j_session, "KubernetesIngress", ["name", "ingress_class_name"]
+    )
+    assert actual_ingress_nodes == expected_ingress_nodes
+
+    # Assert: Verify Ingress to Cluster relationships
+    expected_ingress_to_cluster = {
+        (KUBERNETES_CLUSTER_IDS[0], "my-ingress"),
+        (KUBERNETES_CLUSTER_IDS[0], "simple-ingress"),
+    }
+    actual_ingress_to_cluster = check_rels(
+        neo4j_session,
+        "KubernetesCluster",
+        "id",
+        "KubernetesIngress",
+        "name",
+        "RESOURCE",
+    )
+    assert actual_ingress_to_cluster == expected_ingress_to_cluster
+
+    # Assert: Verify Ingress to Namespace relationships
+    expected_ingress_to_namespace = {
+        (KUBERNETES_CLUSTER_1_NAMESPACES_DATA[-1]["name"], "my-ingress"),
+        (KUBERNETES_CLUSTER_1_NAMESPACES_DATA[-1]["name"], "simple-ingress"),
+    }
+    actual_ingress_to_namespace = check_rels(
+        neo4j_session,
+        "KubernetesNamespace",
+        "name",
+        "KubernetesIngress",
+        "name",
+        "CONTAINS",
+    )
+    assert actual_ingress_to_namespace == expected_ingress_to_namespace
+
+    # Assert: Verify Ingress to Service relationships (TARGETS)
+    expected_ingress_to_service = {
+        ("my-ingress", "api-service"),
+        ("my-ingress", "app-service"),
+        ("simple-ingress", "simple-service"),
+    }
+    actual_ingress_to_service = check_rels(
+        neo4j_session,
+        "KubernetesIngress",
+        "name",
+        "KubernetesService",
+        "name",
+        "TARGETS",
+    )
+    assert actual_ingress_to_service == expected_ingress_to_service
+
+    # Test ALB ingresses with load balancer DNS names
+    mock_get_ingress.return_value = KUBERNETES_ALB_INGRESS_RAW
+    common_job_parameters["UPDATE_TAG"] = TEST_UPDATE_TAG + 1
+
+    sync_ingress(
+        neo4j_session=neo4j_session,
+        client=k8s_client,
+        update_tag=TEST_UPDATE_TAG + 1,
+        common_job_parameters=common_job_parameters,
+    )
+
+    # Assert: Verify ALB ingresses were created with correct properties
+    expected_alb_ingress_nodes = {
+        ("alb-ingress-api", "shared-alb", "alb"),
+        ("alb-ingress-web", "shared-alb", "alb"),
+    }
+    actual_alb_ingress_nodes = check_nodes(
+        neo4j_session,
+        "KubernetesIngress",
+        ["name", "ingress_group_name", "ingress_class_name"],
+    )
+    assert actual_alb_ingress_nodes == expected_alb_ingress_nodes
+
+    # Assert: Verify old ingresses were removed
+    final_ingress_nodes = check_nodes(neo4j_session, "KubernetesIngress", ["name"])
+    assert final_ingress_nodes == {("alb-ingress-api",), ("alb-ingress-web",)}
+
+    # Test empty response handling
+    mock_get_ingress.return_value = []
+    common_job_parameters["UPDATE_TAG"] = TEST_UPDATE_TAG + 2
+
+    sync_ingress(
+        neo4j_session=neo4j_session,
+        client=k8s_client,
+        update_tag=TEST_UPDATE_TAG + 2,
+        common_job_parameters=common_job_parameters,
+    )
+
+    # Assert: All ingresses should be cleaned up
+    ingress_nodes = check_nodes(neo4j_session, "KubernetesIngress", ["name"])
+    assert set() == ingress_nodes

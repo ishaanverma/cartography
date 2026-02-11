@@ -10,6 +10,7 @@ Facts within a Rule are provider-specific implementations of the same concept.
 
 from cartography.rules.spec.model import Fact
 from cartography.rules.spec.model import Finding
+from cartography.rules.spec.model import Framework
 from cartography.rules.spec.model import Maturity
 from cartography.rules.spec.model import Module
 from cartography.rules.spec.model import Rule
@@ -54,7 +55,8 @@ _aws_unrestricted_ssh = Fact(
         "unauthorized access and brute force attacks."
     ),
     cypher_query="""
-    MATCH (a:AWSAccount)-[:RESOURCE]->(sg:EC2SecurityGroup)
+    MATCH (a:AWSAccount)-[:RESOURCE]->(ec2:EC2Instance)
+          -[:MEMBER_OF_EC2_SECURITY_GROUP]->(sg:EC2SecurityGroup)
           <-[:MEMBER_OF_EC2_SECURITY_GROUP]-(rule:IpPermissionInbound)
           <-[:MEMBER_OF_IP_RULE]-(range:IpRange)
     WHERE (range.id = '0.0.0.0/0' OR range.id = '::/0')
@@ -74,7 +76,8 @@ _aws_unrestricted_ssh = Fact(
         a.name AS account
     """,
     cypher_visual_query="""
-    MATCH p=(a:AWSAccount)-[:RESOURCE]->(sg:EC2SecurityGroup)
+    MATCH p=(a:AWSAccount)-[:RESOURCE]->(ec2:EC2Instance)
+          -[:MEMBER_OF_EC2_SECURITY_GROUP]->(sg:EC2SecurityGroup)
           <-[:MEMBER_OF_EC2_SECURITY_GROUP]-(rule:IpPermissionInbound)
           <-[:MEMBER_OF_IP_RULE]-(range:IpRange)
     WHERE (range.id = '0.0.0.0/0' OR range.id = '::/0')
@@ -103,8 +106,6 @@ cis_aws_5_1_unrestricted_ssh = Rule(
     output_model=UnrestrictedSshOutput,
     facts=(_aws_unrestricted_ssh,),
     tags=(
-        "cis:5.1",
-        "cis:aws-5.0",
         "networking",
         "security-groups",
         "ssh",
@@ -113,6 +114,15 @@ cis_aws_5_1_unrestricted_ssh = Rule(
     ),
     version="1.0.0",
     references=CIS_REFERENCES,
+    frameworks=(
+        Framework(
+            name="CIS AWS Foundations Benchmark",
+            short_name="CIS",
+            scope="aws",
+            revision="5.0",
+            requirement="5.1",
+        ),
+    ),
 )
 
 
@@ -143,7 +153,8 @@ _aws_unrestricted_rdp = Fact(
         "unauthorized access and brute force attacks on Windows systems."
     ),
     cypher_query="""
-    MATCH (a:AWSAccount)-[:RESOURCE]->(sg:EC2SecurityGroup)
+    MATCH (a:AWSAccount)-[:RESOURCE]->(ec2:EC2Instance)
+          -[:MEMBER_OF_EC2_SECURITY_GROUP]->(sg:EC2SecurityGroup)
           <-[:MEMBER_OF_EC2_SECURITY_GROUP]-(rule:IpPermissionInbound)
           <-[:MEMBER_OF_IP_RULE]-(range:IpRange)
     WHERE (range.id = '0.0.0.0/0' OR range.id = '::/0')
@@ -163,7 +174,8 @@ _aws_unrestricted_rdp = Fact(
         a.name AS account
     """,
     cypher_visual_query="""
-    MATCH p=(a:AWSAccount)-[:RESOURCE]->(sg:EC2SecurityGroup)
+    MATCH p=(a:AWSAccount)-[:RESOURCE]->(ec2:EC2Instance)
+          -[:MEMBER_OF_EC2_SECURITY_GROUP]->(sg:EC2SecurityGroup)
           <-[:MEMBER_OF_EC2_SECURITY_GROUP]-(rule:IpPermissionInbound)
           <-[:MEMBER_OF_IP_RULE]-(range:IpRange)
     WHERE (range.id = '0.0.0.0/0' OR range.id = '::/0')
@@ -192,8 +204,6 @@ cis_aws_5_2_unrestricted_rdp = Rule(
     output_model=UnrestrictedRdpOutput,
     facts=(_aws_unrestricted_rdp,),
     tags=(
-        "cis:5.2",
-        "cis:aws-5.0",
         "networking",
         "security-groups",
         "rdp",
@@ -202,6 +212,15 @@ cis_aws_5_2_unrestricted_rdp = Rule(
     ),
     version="1.0.0",
     references=CIS_REFERENCES,
+    frameworks=(
+        Framework(
+            name="CIS AWS Foundations Benchmark",
+            short_name="CIS",
+            scope="aws",
+            revision="5.0",
+            requirement="5.2",
+        ),
+    ),
 )
 
 
@@ -285,8 +304,6 @@ cis_aws_5_4_default_sg_traffic = Rule(
     output_model=DefaultSgAllowsTrafficOutput,
     facts=(_aws_default_sg_allows_traffic,),
     tags=(
-        "cis:5.4",
-        "cis:aws-5.0",
         "networking",
         "security-groups",
         "stride:information_disclosure",
@@ -294,4 +311,13 @@ cis_aws_5_4_default_sg_traffic = Rule(
     ),
     version="1.0.0",
     references=CIS_REFERENCES,
+    frameworks=(
+        Framework(
+            name="CIS AWS Foundations Benchmark",
+            short_name="CIS",
+            scope="aws",
+            revision="5.0",
+            requirement="5.4",
+        ),
+    ),
 )

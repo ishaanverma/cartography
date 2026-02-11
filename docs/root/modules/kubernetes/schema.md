@@ -204,6 +204,8 @@ An Ingress is an API object that manages external access to services in a cluste
 ### KubernetesSecret
 Representation of a [Kubernetes Secret.](https://kubernetes.io/docs/concepts/configuration/secret/)
 
+> **Ontology Mapping**: This node has the extra label `Secret` and normalized `_ont_*` properties for cross-platform secret queries. See [Secret](../../ontology/schema.md#secret).
+
 | Field | Description |
 |-------|-------------|
 | **id** | UID of the kubernetes secret |
